@@ -1,9 +1,8 @@
-import pyaudio
-import wave
+from playsound import playsound
 import time
 import requests
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 import os
 
 os.system("clear")  # Automatically clears screen when programme runs
@@ -27,14 +26,14 @@ def playAudio(filename):
   # pa for pyaudio
   pa = pyaudio.PyAudio()
 
-  stream = pa.open(format=pa.get_format_from_width(wf.getsampwidth()),
-                   channels=wf.getnchannels(),
-                   rate=wf.getframerate(),
-                   output=True)
+  stream = pa.open(format = pa.get_format_from_width(wf.getsampwidth()),
+                   channels = wf.getnchannels(),
+                   rate = wf.getframerate(),
+                   output = True)
 
   dataStream = wf.readframes(chunk)
 
-  while dataStream:
+  while dataStream != '':
     stream.write(dataStream)
     dataStream = wf.readframes(chunk)
 
@@ -44,50 +43,26 @@ def playAudio(filename):
 
 oldPrice = 0
 newPrice = 0
-t = 0
-
-
-def lookup():
-  api_request = requests.get("https://api.coinmarketcap.com/v1/ticker/?limit=10")
-  # Into nicely parsed JSON format:
-  api = json.loads(api_request.content)
-  global oldPrice
-  global newPrice
-  global t
-  print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
-  for dic in api:
-    if dic["symbol"] == "BTC":
-      print(bcolors.BOLD + bcolors.WARNING + bcolors.UNDERLINE + "< " + dic["name"] + " (" +
-            dic["symbol"] + ") >" + bcolors.ENDC)
-      print(bcolors.BOLD + " * Current price: $" + dic["price_usd"] + " USD" + bcolors.ENDC)
-      newPrice = float(dic["price_usd"])
-      diff = newPrice - oldPrice
-      t = dic["last_updated"]
-      print("  (Last updated: " + str(datetime.fromtimestamp(float(t))) + ")")
-      if diff < 0:
-        print(bcolors.RED + "  Price fell by $" + str(diff) + " USD" + bcolors.ENDC)
-        playAudio("./audio/napalmdeath.wav")
-      if diff >= 0 and diff < 5000:
-        print(bcolors.GREEN + "  Price rose by $" + str(diff) + " USD" + bcolors.ENDC)
-        playAudio("./audio/light.wav")
-      print(" *1-Hour-Change:")
-      if float(dic["percent_change_1h"]) < 0:
-        print(bcolors.BOLD + bcolors.RED + "    Dropping" + bcolors.ENDC + " by " +
-              dic["percent_change_1h"] + "%")
-      elif float(dic["percent_change_1h"]) > 0:
-        print(bcolors.BOLD + bcolors.GREEN + "    Rising" + bcolors.ENDC + " by " +
-              dic["percent_change_1h"] + "%")
-      print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
-      oldPrice = newPrice
-      api_request = ""
-      api = ""
-
+last_update_time = datetime.now() - timedelta(hours = 2)
 
 while True:
-  api_request = requests.get("https://api.coinmarketcap.com/v1/ticker/?limit=10")
+  api_request = requests.get("https://api.coindesk.com/v1/bpi/currentprice.json")
   api = json.loads(api_request.content)
-  for dic in api:
-    if dic["symbol"] == "BTC":
-      if float(dic["last_updated"]) > float(t):
-        lookup()
-  time.sleep(1)
+  # 2021-02-09T10:27:00+00:00
+  current_update_time = datetime.fromisoformat(api['time']["updatedISO"]).replace(tzinfo=None)
+  if current_update_time > last_update_time:
+    newPrice = api['bpi']['EUR']['rate_float']
+    print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+    print(bcolors.BOLD + bcolors.WARNING + bcolors.UNDERLINE + "< Bitcoin (BTC) >" + bcolors.ENDC)
+    print(bcolors.BOLD + " * Current price: €" + str(newPrice) + "" + bcolors.ENDC)
+    diff = newPrice - oldPrice
+    if diff < -5:
+      print(bcolors.RED + "  Price fell by €" + str(diff) + "" + bcolors.ENDC)
+      playsound("./audio/napalmdeath.mp3")
+    if diff >= 5 :
+      print(bcolors.GREEN + "  Price rose by €" + str(diff) + "" + bcolors.ENDC)
+      playsound("./audio/light.mp3")
+    print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+    oldPrice = newPrice
+    
+  time.sleep(10)
